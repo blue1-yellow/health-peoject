@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.MoodRecordMapper">
+    <insert id="insert">
+        INSERT INTO mood_record(user_id, mood_score, mood_desc, record_time, remark)
+        VALUES(#{userId}, #{moodScore}, #{moodDesc}, #{recordTime}, #{remark})
+    </insert>
+
+    <select id="selectByUserId" resultType="org.health.pojo.MoodRecord">
+        SELECT id, user_id AS userId, mood_score AS moodScore, mood_desc AS moodDesc,
+               record_time AS recordTime, remark
+        FROM mood_record WHERE user_id = #{userId}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM mood_record WHERE id = #{id}
+    </delete>
+
+    <update id="update">
+        UPDATE mood_record
+        SET user_id=#{userId}, mood_score=#{moodScore}, mood_desc=#{moodDesc},
+        record_time=#{recordTime}, remark=#{remark}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="org.health.pojo.MoodRecord">
+        SELECT id, user_id AS userId, mood_score AS moodScore, mood_desc AS moodDesc,
+               record_time AS recordTime, remark
+        FROM mood_record WHERE id = #{id}
+    </select>
+</mapper>

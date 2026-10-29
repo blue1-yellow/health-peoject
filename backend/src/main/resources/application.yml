@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: "${DB_URL:jdbc:mysql://localhost:3306/health_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}"
+    username: "${DB_USERNAME:root}"
+    password: "${DB_PASSWORD:}"
+
+mybatis:
+  mapper-locations: classpath*:/*Mapper.xml
+  type-aliases-package: org.health.pojo
+
+server:
+  port: 8080
+
+ai:
+  doubao:
+    base-url: "${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}"
+    api-key: "${ARK_API_KEY:}"
+    model: "${ARK_MODEL:}"
+  daily-request-limit: "${AI_DAILY_REQUEST_LIMIT:10}"
