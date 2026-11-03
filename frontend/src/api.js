@@ -19,6 +19,8 @@ export async function request(path, options = {}) {
 }
 
 export const api = {
+  profile: () => request('/user/profile'),
+  saveProfile: (payload) => request('/user/profile', { method: 'PUT', body: JSON.stringify(payload) }),
   login: (payload) => request('/user/login', { method: 'POST', body: JSON.stringify(payload) }),
   register: (payload) => request('/user/register', { method: 'POST', body: JSON.stringify(payload) }),
   foodList: () => request('/food/list'),
