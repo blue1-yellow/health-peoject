@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Apple, ArrowUpRight, Bot, CalendarDays, Camera, ChevronRight, CircleUserRound,
   Dumbbell, FileText, HeartPulse, LayoutDashboard, LogOut, MessageCircle, Moon, Plus,
-  Send, Sparkles, Utensils, X,
+  Send, Sparkles, Utensils, X, UserRoundPen,
 } from 'lucide-react';
 import { api } from './api';
 import ExerciseCoach from './ExerciseCoach';
 import UserProfile from './UserProfile';
+import { activityGoal } from './activityGoal';
+import SlideCommit from './SlideCommit';
+import AuthCodeSlots from './AuthCodeSlots';
+import LightTunnel from './LightTunnel';
 
 const now = () => new Date().toISOString().slice(0, 16);
 const navItems = [
@@ -37,6 +41,7 @@ function greetingByBeijingTime() {
 }
 
 function Auth({ onSuccess }) {
+  const formRef = useRef(null);
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ username: '', password: '', name: '' });
   const [error, setError] = useState('');
@@ -48,6 +53,18 @@ function Auth({ onSuccess }) {
       else { const token = await api.login(form); localStorage.setItem('health_token', token); localStorage.setItem('health_user', form.username); onSuccess(); }
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
+  const slideLogin = async () => {
+    if (!formRef.current.reportValidity()) throw new Error('请填写用户名和密码');
+    setLoading(true); setError('');
+    try {
+      const token = await api.login(form);
+      localStorage.setItem('health_token', token);
+      localStorage.setItem('health_user', form.username);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally { setLoading(false); }
+  };
   return <main className="auth-page">
     <section className="auth-visual">
       <div className="brand-mark"><Activity size={24} /></div>
@@ -55,15 +72,16 @@ function Auth({ onSuccess }) {
       <h1>把每一天，<br />过得更有觉察。</h1>
       <p>记录饮食、运动和情绪，让健康习惯成为看得见的日常。</p>
       <div className="auth-image" aria-label="健康生活场景" />
+      <LightTunnel className="auth-tunnel" cableColor="#8ccfbc" pulseColor="#e0f39b" speed={0.08} pulseSpeed={1} cableCount={48} brightness={0.75} opacity={0.7} clickSurge={false} dpr={1} aria-hidden="true" />
     </section>
     <section className="auth-card-wrap">
-      <form className="auth-card" onSubmit={submit}>
+      <form ref={formRef} className="auth-card" onSubmit={submit}>
         <div className="auth-card-heading"><p className="eyebrow">WELCOME</p><h2>{mode === 'login' ? '欢迎回来' : '创建你的账号'}</h2><p>{mode === 'login' ? '登录后继续你的健康旅程' : '用几秒钟，开启健康记录'}</p></div>
         {mode === 'register' && <label>昵称<input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="例如：小安" /></label>}
-        <label>用户名<input required value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="请输入用户名" /></label>
-        <label>密码<input required type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="请输入密码" /></label>
+        <AuthCodeSlots label="用户名" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} autoComplete="username" placeholder="请输入用户名" />
+        <AuthCodeSlots label="密码" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="请输入密码" />
         {error && <p className={error.includes('成功') ? 'notice success' : 'notice'}>{error}</p>}
-        <button className="primary wide" disabled={loading}>{loading ? '处理中...' : mode === 'login' ? '登录' : '注册账号'}<ArrowUpRight size={17} /></button>
+        {mode === 'login' ? <SlideCommit className="auth-slide" label="滑动登录" doneLabel="登录成功" errorLabel="登录失败，请重试" onConfirm={slideLogin} onDone={onSuccess} disabled={loading} width={328} height={56} trackColor="#0f766e" handleColor="#ffffff" successColor="#d9f06a" dangerColor="#d75d50" /> : <button className="primary wide" disabled={loading}>{loading ? '处理中...' : '注册账号'}<ArrowUpRight size={17} /></button>}
         <button type="button" className="text-button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>{mode === 'login' ? '还没有账号？去注册' : '已有账号？去登录'}</button>
       </form>
     </section>
@@ -118,17 +136,88 @@ function RecentRows({ data, onAdd }) { const rows = useMemo(() => [...data.food.
 
 function FoodEditModal({ item, onClose, onSaved }) { const [form, setForm] = useState({ foodName: item.foodName || '', cal: item.cal ?? '', note: item.note || '', eatTime: item.eatTime ? new Date(item.eatTime).toISOString().slice(0, 16) : now() }); const [error, setError] = useState(''); const submit = async (event) => { event.preventDefault(); setError(''); try { await api.updateFood(item.id, { ...form, cal: Number(form.cal), eatTime: `${form.eatTime}:00` }); await onSaved(); onClose(); } catch (err) { setError(err.message || '保存失败'); } }; return <Modal title="编辑饮食记录" onClose={onClose}><form className="record-form" onSubmit={submit}><label>食物名称<input required value={form.foodName} onChange={e => setForm({...form, foodName: e.target.value})} /></label><label>热量（kcal）<input required type="number" min="0" value={form.cal} onChange={e => setForm({...form, cal: e.target.value})} /></label><label>用餐时间<input required type="datetime-local" value={form.eatTime} onChange={e => setForm({...form, eatTime: e.target.value})} /></label><label>备注<input value={form.note} onChange={e => setForm({...form, note: e.target.value})} /></label>{error && <p className="notice">{error}</p>}<button className="primary wide">保存修改 <ArrowUpRight size={17} /></button></form></Modal>; }
 
-function WorkoutScreenshotModal({ onClose, onSaved }) {
+function WorkoutScreenshotModal({ onClose, onSaved, profile, onOpenProfile }) {
   const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[analyzing,setAnalyzing]=useState(false),[error,setError]=useState(''),[result,setResult]=useState(null),[form,setForm]=useState(null);
-  const selectFile=(event)=>{const next=event.target.files?.[0];if(!next)return;if(next.size>8*1024*1024){setError('图片不能超过 8MB');return;}setFile(next);setPreview(URL.createObjectURL(next));setResult(null);setForm(null);setError('');};
+  const selectFile=(event)=>{const next=event.target.files?.[0];if(!next)return;if(next.size>8*1024*1024){setError('图片不能超过 8MB');return;}setFile(next);setPreview(URL.createObjectURL(next));setResult(null);setForm(null);setDailyCalories('');setError('');};
   const analyze=async()=>{if(!file)return;setAnalyzing(true);setError('');try{const response=await api.identifyWorkout(file);const parsed=JSON.parse(response.reply.replace(/```json|```/g,'').trim());const recordTime=parsed.recordTime&&/^\d{4}-\d{2}-\d{2}T/.test(parsed.recordTime)?parsed.recordTime.slice(0,16):now();setResult({ ...parsed, disclaimer:response.disclaimer });setForm({sportName:parsed.sportName||'运动训练',duration:parsed.duration??'',calorie:parsed.calorie??'',recordTime,remark:`手环截图导入${parsed.summary?`：${parsed.summary}`:''}`});}catch(err){setError(err.message||'识别失败，请确认截图清晰且包含运动数据');}finally{setAnalyzing(false);}};
   const save=async(event)=>{event.preventDefault();setError('');try{await api.addSport({...form,duration:Number(form.duration),calorie:Number(form.calorie),recordTime:`${form.recordTime}:00`});await onSaved();onClose();}catch(err){setError(err.message||'导入失败');}};
-  return <Modal title="导入手环运动截图" onClose={onClose}><div className="workout-import"><label className="image-upload">选择手环或运动 App 截图<input type="file" accept="image/*" onChange={selectFile}/><small>仅上传截图用于本次识别，图片不能超过 8MB。</small></label>{preview&&<img className="workout-preview" src={preview} alt="运动截图预览"/>}{file&&!result&&<button className="primary wide" onClick={analyze} disabled={analyzing}>{analyzing?'正在识别运动数据...':'分析截图并生成建议'}</button>}{result&&<><section className="workout-result"><p className="eyebrow">ANALYSIS RESULT</p><strong>{result.summary||'已识别截图中的运动数据'}</strong><p>{result.suggestion||'建议根据自身状态安排适量运动，并注意补水与休息。'}</p><small>{result.disclaimer}</small></section><form className="record-form" onSubmit={save}><label>运动类型<input required value={form.sportName} onChange={e=>setForm({...form,sportName:e.target.value})}/></label><div className="form-split"><label>时长（分钟）<input required min="1" type="number" value={form.duration} onChange={e=>setForm({...form,duration:e.target.value})}/></label><label>消耗热量（kcal）<input required min="0" type="number" value={form.calorie} onChange={e=>setForm({...form,calorie:e.target.value})}/></label></div><label>运动时间<input required type="datetime-local" value={form.recordTime} onChange={e=>setForm({...form,recordTime:e.target.value})}/></label><label>备注<input value={form.remark} onChange={e=>setForm({...form,remark:e.target.value})}/></label><button className="primary wide">确认并导入运动记录 <ArrowUpRight size={17}/></button></form></>}{error&&<p className="notice">{error}</p>}</div></Modal>;
+  const [dailyCalories, setDailyCalories] = useState('');
+  const goal = activityGoal(profile?.age, profile?.weight, dailyCalories);
+  return <Modal title="导入手环运动截图" onClose={onClose}><div className="workout-import"><label className="image-upload">选择手环或运动 App 截图<input type="file" accept="image/*" onChange={selectFile}/><small>仅上传截图用于本次识别，图片不能超过 8MB。</small></label>{preview&&<img className="workout-preview" src={preview} alt="运动截图预览"/>}{file&&!result&&<button className="primary wide" onClick={analyze} disabled={analyzing}>{analyzing?'正在识别运动数据...':'分析截图并生成建议'}</button>}{result&&<><section className="workout-result"><p className="eyebrow">ANALYSIS RESULT</p><strong>{result.summary||'已识别截图中的运动数据'}</strong><p>{result.suggestion||'建议根据自身状态安排适量运动，并注意补水与休息。'}</p><small>{result.disclaimer}</small></section><section className="activity-goal"><h2>每日活动目标</h2>{!goal ? <><p>{profile?.age && Number(profile.age) < 18 ? '18 岁以下暂不提供此成人目标估算。' : '请先在个人资料中填写成年年龄和体重，以估算活动目标。'}</p><button type="button" className="quiet-button" onClick={onOpenProfile}>前往个人资料 <ChevronRight size={15}/></button></> : <><p>根据 {profile.age} 岁、{profile.weight} kg 估算的每日活动热量参考目标</p><div className="goal-target"><strong>{goal.target}</strong><span>kcal / 天</span></div><label className="goal-input">当天累计活动热量（kcal）<input type="number" min="0" step="any" value={dailyCalories} onChange={e=>setDailyCalories(e.target.value)} placeholder="核对截图后输入"/></label><small>请确认填写的是当天累计活动热量，而非基础代谢、总消耗或单次运动热量；不会与其他记录相加。</small>{goal.remaining != null && <div className="goal-progress" role="status"><div><span>距目标还差</span><strong>{Math.ceil(goal.remaining)} <small>kcal</small></strong></div><div><span>预计还需行走</span><strong>{goal.steps.toLocaleString()} <small>步</small></strong></div><div className="goal-bar" role="progressbar" aria-label="活动热量目标进度" aria-valuemin="0" aria-valuemax={goal.target} aria-valuenow={Math.min(goal.target,Number(dailyCalories))}><span style={{width:`${Math.min(100, Number(dailyCalories) / goal.target * 100)}%`}}/></div>{goal.remaining===0&&<p>已达到参考目标。</p>}</div>}<small>成人参考每周 150 分钟中等强度活动，按每天平均、3.5 MET 快走及每分钟 100 步估算活动热量（扣除静息消耗）。实际因步速、体质和设备算法而异，不是医疗最低标准；有疾病或活动限制时请遵医嘱。</small></>}</section><form className="record-form" onSubmit={save}><label>运动类型<input required value={form.sportName} onChange={e=>setForm({...form,sportName:e.target.value})}/></label><div className="form-split"><label>时长（分钟）<input required min="1" type="number" value={form.duration} onChange={e=>setForm({...form,duration:e.target.value})}/></label><label>消耗热量（kcal）<input required min="0" type="number" value={form.calorie} onChange={e=>setForm({...form,calorie:e.target.value})}/></label></div><label>运动时间<input required type="datetime-local" value={form.recordTime} onChange={e=>setForm({...form,recordTime:e.target.value})}/></label><label>备注<input value={form.remark} onChange={e=>setForm({...form,remark:e.target.value})}/></label><button className="primary wide">确认并导入运动记录 <ArrowUpRight size={17}/></button></form></>}{error&&<p className="notice">{error}</p>}</div></Modal>;
 }
 
 function Records({ type, records, onAdd, onEdit, onDelete, onImportWorkout }) { const config={food:{title:'饮食记录',desc:'了解每一餐的能量与选择。',icon:Apple},sport:{title:'运动记录',desc:'每一次活动，都在为身体积蓄能量。',icon:Dumbbell},mood:{title:'情绪记录',desc:'看见情绪，才能更好地照顾自己。',icon:HeartPulse}}[type]; const Icon=config.icon; return <><div className="page-title"><div><p className="eyebrow">MY RECORDS</p><h1>{config.title}</h1><p>{config.desc}</p></div><div className="record-page-actions">{type==='sport'&&<button className="outlined" onClick={onImportWorkout}>导入手环截图</button>}<button className="primary" onClick={()=>onAdd(type)}><Plus size={17}/>添加记录</button></div></div><section className="panel record-list"><div className="panel-head"><div><h2>全部记录</h2><p>{records.length} 条数据</p></div></div>{records.length ? <div className="full-rows">{records.map(item=><div className="full-row" key={item.id}><span className={`record-icon ${type}`}><Icon size={19}/></span><div className="record-main"><strong>{type==='food'?item.foodName:type==='sport'?item.sportName:item.moodDesc}</strong><p>{formatTime(type==='food'?item.eatTime:item.recordTime)} {item.note||item.remark ? `· ${item.note||item.remark}`:''}</p></div><div className="record-detail">{type==='food'?`${item.cal||0} kcal`:type==='sport'?`${item.duration||0} 分钟 · ${item.calorie||0} kcal`:`${item.moodScore||'--'} / 10`}</div>{type==='food' && <div className="row-actions"><button className="quiet-button" onClick={()=>onEdit(item)}>编辑</button><button className="quiet-button danger" onClick={()=>onDelete(item)}>删除</button></div>}</div>)}</div>:<div className="empty-state"><p>还没有{config.title}。</p><button className="outlined" onClick={()=>onAdd(type)}>添加第一条记录</button></div>}</section></>; }
 
 function AiAssistant() { const [messages, setMessages]=useState([{role:'ai',text:'你好，我是你的健康助手。你可以问我今天的饮食、运动节奏，或告诉我现在的感受。'}]); const [value,setValue]=useState(''); const [sending,setSending]=useState(false); const [workflow,setWorkflow]=useState([]); const [report,setReport]=useState(null); const [reportError,setReportError]=useState(''); const send=async()=>{if(!value.trim()||sending)return;const question=value.trim();setMessages(current=>[...current,{role:'user',text:question}]);setValue('');setSending(true);setWorkflow(["正在判断问题需要哪些健康数据"]);try{const result=await api.aiChat(question);setWorkflow(result.workflow||[]);setMessages(current=>[...current,{role:'ai',text:result.reply,disclaimer:result.disclaimer,workflow:result.workflow}]);}catch(error){setMessages(current=>[...current,{role:'ai',text:`暂时无法获取 AI 回复：${error.message}`}]);}finally{setSending(false);}}; const generateReport=async()=>{if(sending)return;setSending(true);setReportError('');try{setReport(await api.dailyReport());}catch(error){setReportError(error.message);}finally{setSending(false);}};return <><div className="page-title"><div><p className="eyebrow">PERSONAL HEALTH AI</p><h1>AI 健康助手</h1><p>依据你的记录，获得更贴近生活的健康建议。</p></div></div><section className="report-card"><div><span className="report-icon"><FileText size={20}/></span><p className="eyebrow">TODAY'S REPORT</p><h2>生成今日健康报告</h2><p>汇总今天的饮食、运动与情绪，得到一条清晰的明日行动建议。</p></div><button className="primary" onClick={generateReport} disabled={sending}><Sparkles size={17}/>{sending?'生成中...':'一键生成'}</button></section>{reportError&&<div className="load-warning">生成报告失败：{reportError}</div>}{report&&<section className="panel generated-report"><div className="panel-head"><div><p className="eyebrow">GENERATED TODAY</p><h2>我的今日健康报告</h2></div><span className="report-model">{report.model}</span></div><div className="report-content">{report.reply}</div><small className="disclaimer">{report.disclaimer}</small></section>}<section className="ai-layout"><div className="ai-hero"><div className="ai-orb"><Bot size={40}/></div><p className="eyebrow light">YOUR PERSONAL GUIDE</p><h2>从记录出发，<br/>给出更懂你的建议。</h2><span>Agent · 按需读取个人健康数据</span></div><div className="panel chat"><div className="chat-head"><div className="ai-badge"><Sparkles size={16}/></div><div><strong>健康助手</strong><p><i/>在线</p></div></div><div className="messages">{messages.map((message,index)=><div className={`message ${message.role}`} key={index}>{message.text}{message.workflow?.length>0&&<div className="workflow-list">{message.workflow.map((step,i)=><span key={i}><i/>{step}</span>)}</div>}{message.disclaimer&&<small className="disclaimer">{message.disclaimer}</small>}</div>)}{sending&&<div className="message ai"><span className="workflow-live">{workflow.map((step,i)=><span key={i}><i/>{step}</span>)}<span><i className="pulse"/>智能体正在分析并调用工具...</span></span></div>}</div><div className="chat-input"><input disabled={sending} value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="输入你想问的问题..."/><button disabled={sending} onClick={send} title="发送"><Send size={18}/></button></div></div></section></>; }
 
-export default function App() { const [authed,setAuthed]=useState(Boolean(localStorage.getItem('health_token')));const [profile,setProfile]=useState(null);const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [foodEdit,setFoodEdit]=useState(null);const [workoutImport,setWorkoutImport]=useState(false);const [data,setData]=useState({food:[],sport:[],mood:[]});const [loading,setLoading]=useState(false);const [loadError,setLoadError]=useState(''); const userId=useMemo(()=>{try { const token=localStorage.getItem('health_token'); return token ? JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub : null; } catch { return null; }},[authed]); const load=async()=>{if(!authed||!userId)return;setLoading(true);try{const [food,sport,mood]=await Promise.all([api.foodList(),api.sportList(userId),api.moodList(userId)]);setData({food:Array.isArray(food)?food:[],sport:Array.isArray(sport)?sport:[],mood:Array.isArray(mood)?mood:[]});setLoadError('');}catch(e){setLoadError(e.message);}finally{setLoading(false);}};useEffect(()=>{load();},[authed,userId]);useEffect(()=>{if(!authed){setProfile(null);return;}let active=true;api.profile().then(value=>{if(active){setProfile(value);if(value.name)localStorage.setItem('health_user',value.name);}}).catch(()=>{});return ()=>{active=false;};},[authed]);const deleteFood=async(item)=>{if(!window.confirm(`确定删除“${item.foodName}”吗？`))return;try{await api.deleteFood(item.id);await load();}catch(e){setLoadError(e.message);}};if(!authed)return <Auth onSuccess={()=>setAuthed(true)}/>;const content=view==='profile'?<UserProfile onSaved={value=>{setProfile(value);localStorage.setItem('health_user',value.name);}}/>:view==='dashboard'?<Dashboard data={data} onAdd={setModal} setView={setView}/>:view==='ai'?<AiAssistant data={data}/>:view==='coach'?<ExerciseCoach/>:<Records type={view} records={data[view]} onAdd={setModal} onEdit={setFoodEdit} onDelete={deleteFood} onImportWorkout={()=>setWorkoutImport(true)}/>;return <div className="app-shell"><aside><div className="side-brand"><span className="brand-mark"><Activity size={20}/></span><span>健康伴侣</span></div><nav>{navItems.map(([key,label,Icon])=><button key={key} className={view===key?'nav-item active':'nav-item'} onClick={()=>setView(key)}><Icon size={19}/>{label}</button>)}</nav><div className="side-bottom"><button className="profile" onClick={()=>setView('profile')} aria-label="编辑个人资料"><span>{profile?.avatar?<img className="sidebar-avatar" src={profile.avatar} alt="我的头像"/>:<CircleUserRound size={20}/>}</span><div><strong>{profile?.name||localStorage.getItem('health_user')||'健康用户'}</strong><small>我的账号</small></div></button><button className="nav-item logout" onClick={()=>{localStorage.removeItem('health_token');setAuthed(false)}}><LogOut size={19}/>退出登录</button></div></aside><main className="main-content">{loadError&&<div className="load-warning">数据加载失败：{loadError}。请确认后端已启动。</div>}{loading?<div className="loading">正在同步健康记录...</div>:content}</main>{modal&&<RecordForm type={modal} onClose={()=>setModal(null)} onSaved={load}/>} {foodEdit&&<FoodEditModal item={foodEdit} onClose={()=>setFoodEdit(null)} onSaved={load}/>} {workoutImport&&<WorkoutScreenshotModal onClose={()=>setWorkoutImport(false)} onSaved={load}/>}</div>; }
+export default function App() {
+  const [authed, setAuthed] = useState(Boolean(localStorage.getItem('health_token')));
+  const [profile, setProfile] = useState(null);
+  const [view, setView] = useState('dashboard');
+  const [modal, setModal] = useState(null);
+  const [foodEdit, setFoodEdit] = useState(null);
+  const [workoutImport, setWorkoutImport] = useState(false);
+  const [data, setData] = useState({ food: [], sport: [], mood: [] });
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const userId = useMemo(() => {
+    try {
+      const token = localStorage.getItem('health_token');
+      return token ? JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub : null;
+    } catch { return null; }
+  }, [authed]);
+  const load = async () => {
+    if (!authed || !userId) return;
+    setLoading(true);
+    try {
+      const [food, sport, mood] = await Promise.all([api.foodList(), api.sportList(userId), api.moodList(userId)]);
+      setData({ food: Array.isArray(food) ? food : [], sport: Array.isArray(sport) ? sport : [], mood: Array.isArray(mood) ? mood : [] });
+      setLoadError('');
+    } catch (e) { setLoadError(e.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [authed, userId]);
+  useEffect(() => {
+    if (!authed) { setProfile(null); return; }
+    let active = true;
+    api.profile().then(value => {
+      if (active) {
+        setProfile(value);
+        if (value.name) localStorage.setItem('health_user', value.name);
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [authed]);
+  const deleteFood = async (item) => {
+    if (!window.confirm(`确定删除“${item.foodName}”吗？`)) return;
+    try { await api.deleteFood(item.id); await load(); }
+    catch (e) { setLoadError(e.message); }
+  };
+  if (!authed) return <Auth onSuccess={() => setAuthed(true)} />;
+  const content = view === 'profile'
+    ? <UserProfile onSaved={value => { setProfile(value); localStorage.setItem('health_user', value.name); }} />
+    : view === 'dashboard' ? <Dashboard data={data} onAdd={setModal} setView={setView} />
+      : view === 'ai' ? <AiAssistant data={data} />
+        : view === 'coach' ? <ExerciseCoach />
+          : <Records type={view} records={data[view]} onAdd={setModal} onEdit={setFoodEdit} onDelete={deleteFood} onImportWorkout={() => setWorkoutImport(true)} />;
+  return <div className="app-shell">
+    <aside>
+      <div className="side-brand"><span className="brand-mark"><Activity size={20} /></span><span>健康伴侣</span></div>
+      <nav>{navItems.map(([key, label, Icon]) => <button key={key} className={view === key ? 'nav-item active' : 'nav-item'} onClick={() => setView(key)}><Icon size={19} />{label}</button>)}</nav>
+      <div className="side-bottom">
+        <button className="profile" onClick={() => setView('profile')} aria-label="查看个人资料">
+          <span>{profile?.avatar ? <img className="sidebar-avatar" src={profile.avatar} alt="我的头像" /> : <CircleUserRound size={20} />}</span>
+          <div><strong>{profile?.name || localStorage.getItem('health_user') || '健康用户'}</strong><small>我的账号</small></div>
+          <ChevronRight className="profile-chevron" size={16} />
+        </button>
+        <button className="account-edit" onClick={() => setView('profile')}><UserRoundPen size={16} />编辑个人资料<ArrowUpRight className="account-edit-arrow" size={15} /></button>
+        <button className="nav-item logout" onClick={() => { localStorage.removeItem('health_token'); setAuthed(false); }}><LogOut size={19} />退出登录</button>
+      </div>
+    </aside>
+    <main className="main-content">{loadError && <div className="load-warning">数据加载失败：{loadError}。请确认后端已启动。</div>}{loading ? <div className="loading">正在同步健康记录...</div> : content}</main>
+    {modal && <RecordForm type={modal} onClose={() => setModal(null)} onSaved={load} />}
+    {foodEdit && <FoodEditModal item={foodEdit} onClose={() => setFoodEdit(null)} onSaved={load} />}
+    {workoutImport && <WorkoutScreenshotModal onClose={() => setWorkoutImport(false)} onSaved={load} profile={profile} onOpenProfile={() => { setWorkoutImport(false); setView('profile'); }} />}
+  </div>;
+}
 
